@@ -15,11 +15,13 @@
  */
 package com.example.android.soonami;
 
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -32,8 +34,12 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
  * Displays information about a single earthquake.
@@ -52,9 +58,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Kick off an {@link AsyncTask} to perform the network request
-        TsunamiAsyncTask task = new TsunamiAsyncTask();
-        task.execute();
+        TaskRunner runner = new TaskRunner();
+        runner.executeAsync(new NetworkTask());
     }
 
     /**
@@ -78,7 +83,8 @@ public class MainActivity extends AppCompatActivity {
      * Returns a formatted date and time string for when the earthquake happened.
      */
     private String getDateString(long timeInMilliseconds) {
-        SimpleDateFormat formatter = new SimpleDateFormat("EEE, d MMM yyyy 'at' HH:mm:ss z");
+        SimpleDateFormat formatter = new SimpleDateFormat("EEE, d MMM yyyy 'at' HH:mm:ss z",
+                Locale.getDefault());
         return formatter.format(timeInMilliseconds);
     }
 
@@ -96,14 +102,93 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * {@link AsyncTask} to perform the network request on a background thread, and then
-     * update the UI with the first earthquake in the response.
-     */
-    private class TsunamiAsyncTask extends AsyncTask<URL, Void, Event> {
+    private interface CustomCallable<Event> extends Callable<com.example.android.soonami.Event> {
+        void setDataAfterLoading(com.example.android.soonami.Event result);
+        void setUiForLoading();
+    }
+
+    public static class TaskRunner {
+        private final Handler handler = new Handler(Looper.getMainLooper());
+        private final Executor executor = Executors.newCachedThreadPool();
+
+        public <Event> void executeAsync(CustomCallable<com.example.android.soonami.Event> callable) {
+            try {
+                callable.setUiForLoading();
+                executor.execute(new RunnableTask<com.example.android.soonami.Event>(handler, callable));
+            } catch (Exception e) {
+                Log.e(LOG_TAG, "Error with executeAsync", e);
+            }
+        }
+
+        public static class RunnableTask<Event> implements Runnable{
+            private final Handler handler;
+            private final CustomCallable<com.example.android.soonami.Event> callable;
+
+            public RunnableTask(Handler handler,
+                                CustomCallable<com.example.android.soonami.Event> callable) {
+                this.handler = handler;
+                this.callable = callable;
+            }
+
+            @Override
+            public void run() {
+                try {
+                    final com.example.android.soonami.Event result = callable.call();
+                    handler.post(new RunnableTaskForHandler(callable, result));
+                } catch (Exception e) {
+                    Log.e(LOG_TAG, "Error with running task", e);
+                }
+            }
+        }
+
+        public static class RunnableTaskForHandler<Event> implements Runnable{
+
+            private final CustomCallable<com.example.android.soonami.Event> callable;
+            private final com.example.android.soonami.Event result;
+
+            public RunnableTaskForHandler(CustomCallable<com.example.android.soonami.Event> callable,
+                                          com.example.android.soonami.Event result) {
+                this.callable = callable;
+                this.result = result;
+            }
+
+            @Override
+            public void run() {
+                callable.setDataAfterLoading(result);
+            }
+        }
+    }
+
+    public abstract class BaseTask<Event> implements CustomCallable<com.example.android.soonami.Event> {
+        @Override
+        public void setUiForLoading() {
+
+        }
 
         @Override
-        protected Event doInBackground(URL... urls) {
+        public void setDataAfterLoading(com.example.android.soonami.Event result) {
+            if (result == null) {
+                return;
+            }
+            updateUi(result);
+        }
+
+        @Override
+        public com.example.android.soonami.Event call() throws Exception {
+            return null;
+        }
+    }
+
+    public class NetworkTask extends BaseTask<Event> {
+
+//        private final iOnDataFetched listener;//listener in fragment that shows and hides ProgressBar
+//        public NetworkTask(iOnDataFetched onDataFetchedListener) {
+        public NetworkTask() {
+//            this.listener = onDataFetchedListener;
+        }
+
+        @Override
+        public Event call() throws Exception {
             // Create URL object
             URL url = createUrl(USGS_REQUEST_URL);
 
@@ -112,27 +197,11 @@ public class MainActivity extends AppCompatActivity {
             try {
                 jsonResponse = makeHttpRequest(url);
             } catch (IOException e) {
-                // TODO Handle the IOException
+                Log.e(LOG_TAG, "Error with getting JSON response", e);
             }
 
             // Extract relevant fields from the JSON response and create an {@link Event} object
-            Event earthquake = extractFeatureFromJson(jsonResponse);
-
-            // Return the {@link Event} object as the result fo the {@link TsunamiAsyncTask}
-            return earthquake;
-        }
-
-        /**
-         * Update the screen with the given earthquake (which was the result of the
-         * {@link TsunamiAsyncTask}).
-         */
-        @Override
-        protected void onPostExecute(Event earthquake) {
-            if (earthquake == null) {
-                return;
-            }
-
-            updateUi(earthquake);
+            return (Event) extractFeatureFromJson(jsonResponse);
         }
 
         /**
@@ -165,7 +234,7 @@ public class MainActivity extends AppCompatActivity {
                 inputStream = urlConnection.getInputStream();
                 jsonResponse = readFromStream(inputStream);
             } catch (IOException e) {
-                // TODO: Handle the exception
+                Log.e(LOG_TAG, "Problem with making HTTP request", e);
             } finally {
                 if (urlConnection != null) {
                     urlConnection.disconnect();
@@ -185,7 +254,8 @@ public class MainActivity extends AppCompatActivity {
         private String readFromStream(InputStream inputStream) throws IOException {
             StringBuilder output = new StringBuilder();
             if (inputStream != null) {
-                InputStreamReader inputStreamReader = new InputStreamReader(inputStream, Charset.forName("UTF-8"));
+                InputStreamReader inputStreamReader =
+                        new InputStreamReader(inputStream, StandardCharsets.UTF_8);
                 BufferedReader reader = new BufferedReader(inputStreamReader);
                 String line = reader.readLine();
                 while (line != null) {
@@ -224,5 +294,22 @@ public class MainActivity extends AppCompatActivity {
             }
             return null;
         }
+
+//        @Override
+//        public void setUiForLoading() {
+//            listener.showProgressBar();
+//        }
+//
+//        @Override
+//        public void setDataAfterLoading(Event result) {
+//            listener.setDataInPageWithResult(result);
+//            listener.hideProgressBar();
+//        }
     }
+
+//    public interface iOnDataFetched{
+//        void showProgressBar();
+//        void hideProgressBar();
+//        void setDataInPageWithResult(Event result);
+//    }
 }
