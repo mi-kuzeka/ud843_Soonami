@@ -62,58 +62,13 @@ public class MainActivity extends AppCompatActivity {
         runner.executeAsync(new NetworkTask());
     }
 
-    /**
-     * Update the screen to display information from the given {@link Event}.
-     */
-    private void updateUi(Event earthquake) {
-        // Display the earthquake title in the UI
-        TextView titleTextView = (TextView) findViewById(R.id.title);
-        titleTextView.setText(earthquake.title);
-
-        // Display the earthquake date in the UI
-        TextView dateTextView = (TextView) findViewById(R.id.date);
-        dateTextView.setText(getDateString(earthquake.time));
-
-        // Display whether or not there was a tsunami alert in the UI
-        TextView tsunamiTextView = (TextView) findViewById(R.id.tsunami_alert);
-        tsunamiTextView.setText(getTsunamiAlertString(earthquake.tsunamiAlert));
-    }
-
-    /**
-     * Returns a formatted date and time string for when the earthquake happened.
-     */
-    private String getDateString(long timeInMilliseconds) {
-        SimpleDateFormat formatter = new SimpleDateFormat("EEE, d MMM yyyy 'at' HH:mm:ss z",
-                Locale.getDefault());
-        return formatter.format(timeInMilliseconds);
-    }
-
-    /**
-     * Return the display string for whether or not there was a tsunami alert for an earthquake.
-     */
-    private String getTsunamiAlertString(int tsunamiAlert) {
-        switch (tsunamiAlert) {
-            case 0:
-                return getString(R.string.alert_no);
-            case 1:
-                return getString(R.string.alert_yes);
-            default:
-                return getString(R.string.alert_not_available);
-        }
-    }
-
-    private interface CustomCallable<Event> extends Callable<com.example.android.soonami.Event> {
-        void setDataAfterLoading(com.example.android.soonami.Event result);
-        void setUiForLoading();
-    }
-
     public static class TaskRunner {
         private final Handler handler = new Handler(Looper.getMainLooper());
         private final Executor executor = Executors.newCachedThreadPool();
 
         public <Event> void executeAsync(CustomCallable<com.example.android.soonami.Event> callable) {
             try {
-                callable.setUiForLoading();
+//                callable.setUiForLoading();
                 executor.execute(new RunnableTask<com.example.android.soonami.Event>(handler, callable));
             } catch (Exception e) {
                 Log.e(LOG_TAG, "Error with executeAsync", e);
@@ -159,11 +114,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public abstract class BaseTask<Event> implements CustomCallable<com.example.android.soonami.Event> {
-        @Override
-        public void setUiForLoading() {
+    private interface CustomCallable<Event> extends Callable<com.example.android.soonami.Event> {
+        void setDataAfterLoading(com.example.android.soonami.Event result);
+//        void setUiForLoading();
+    }
 
-        }
+    public abstract class BaseTask<Event> implements CustomCallable<com.example.android.soonami.Event> {
+//        @Override
+//        public void setUiForLoading() {
+//
+//        }
 
         @Override
         public void setDataAfterLoading(com.example.android.soonami.Event result) {
@@ -181,7 +141,7 @@ public class MainActivity extends AppCompatActivity {
 
     public class NetworkTask extends BaseTask<Event> {
 
-//        private final iOnDataFetched listener;//listener in fragment that shows and hides ProgressBar
+        //        private final iOnDataFetched listener;//listener in fragment that shows and hides ProgressBar
 //        public NetworkTask(iOnDataFetched onDataFetchedListener) {
         public NetworkTask() {
 //            this.listener = onDataFetchedListener;
@@ -305,6 +265,46 @@ public class MainActivity extends AppCompatActivity {
 //            listener.setDataInPageWithResult(result);
 //            listener.hideProgressBar();
 //        }
+    }
+
+    /**
+     * Update the screen to display information from the given {@link Event}.
+     */
+    private void updateUi(Event earthquake) {
+        // Display the earthquake title in the UI
+        TextView titleTextView = (TextView) findViewById(R.id.title);
+        titleTextView.setText(earthquake.title);
+
+        // Display the earthquake date in the UI
+        TextView dateTextView = (TextView) findViewById(R.id.date);
+        dateTextView.setText(getDateString(earthquake.time));
+
+        // Display whether or not there was a tsunami alert in the UI
+        TextView tsunamiTextView = (TextView) findViewById(R.id.tsunami_alert);
+        tsunamiTextView.setText(getTsunamiAlertString(earthquake.tsunamiAlert));
+    }
+
+    /**
+     * Returns a formatted date and time string for when the earthquake happened.
+     */
+    private String getDateString(long timeInMilliseconds) {
+        SimpleDateFormat formatter = new SimpleDateFormat("EEE, d MMM yyyy 'at' HH:mm:ss z",
+                Locale.getDefault());
+        return formatter.format(timeInMilliseconds);
+    }
+
+    /**
+     * Return the display string for whether or not there was a tsunami alert for an earthquake.
+     */
+    private String getTsunamiAlertString(int tsunamiAlert) {
+        switch (tsunamiAlert) {
+            case 0:
+                return getString(R.string.alert_no);
+            case 1:
+                return getString(R.string.alert_yes);
+            default:
+                return getString(R.string.alert_not_available);
+        }
     }
 
 //    public interface iOnDataFetched{
