@@ -18,6 +18,7 @@ package com.example.android.soonami;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.Log;
 import android.widget.TextView;
 
@@ -46,12 +47,16 @@ import java.util.concurrent.Executors;
  */
 public class MainActivity extends AppCompatActivity {
 
-    /** Tag for the log messages */
+    /**
+     * Tag for the log messages
+     */
     public static final String LOG_TAG = MainActivity.class.getSimpleName();
 
-    /** URL to query the USGS dataset for earthquake information */
+    /**
+     * URL to query the USGS dataset for earthquake information
+     */
     private static final String USGS_REQUEST_URL =
-            "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2012-01-01&endtime=2012-12-01&minmagnitude=6";
+            "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2014-01-01&endtime=2014-12-01&minmagnitude=7";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        public static class RunnableTask<Event> implements Runnable{
+        public static class RunnableTask<Event> implements Runnable {
             private final Handler handler;
             private final CustomCallable<com.example.android.soonami.Event> callable;
 
@@ -96,7 +101,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        public static class RunnableTaskForHandler<Event> implements Runnable{
+        public static class RunnableTaskForHandler<Event> implements Runnable {
 
             private final CustomCallable<com.example.android.soonami.Event> callable;
             private final com.example.android.soonami.Event result;
@@ -183,6 +188,11 @@ public class MainActivity extends AppCompatActivity {
          */
         private String makeHttpRequest(URL url) throws IOException {
             String jsonResponse = "";
+
+            if (url == null) {
+                return jsonResponse;
+            }
+
             HttpURLConnection urlConnection = null;
             InputStream inputStream = null;
             try {
@@ -191,8 +201,10 @@ public class MainActivity extends AppCompatActivity {
                 urlConnection.setReadTimeout(10000 /* milliseconds */);
                 urlConnection.setConnectTimeout(15000 /* milliseconds */);
                 urlConnection.connect();
-                inputStream = urlConnection.getInputStream();
-                jsonResponse = readFromStream(inputStream);
+                if (urlConnection.getResponseCode() / 100 == 2) {
+                    inputStream = urlConnection.getInputStream();
+                    jsonResponse = readFromStream(inputStream);
+                }
             } catch (IOException e) {
                 Log.e(LOG_TAG, "Problem with making HTTP request", e);
             } finally {
@@ -231,6 +243,10 @@ public class MainActivity extends AppCompatActivity {
          * about the first earthquake from the input earthquakeJSON string.
          */
         private Event extractFeatureFromJson(String earthquakeJSON) {
+            if (TextUtils.isEmpty(earthquakeJSON)) {
+                return null;
+            }
+
             try {
                 JSONObject baseJsonResponse = new JSONObject(earthquakeJSON);
                 JSONArray featureArray = baseJsonResponse.getJSONArray("features");

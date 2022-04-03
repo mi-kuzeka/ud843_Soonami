@@ -35,4 +35,6 @@
 
     <!-- Text when there was a tsunami alert issued [CHAR LIMIT=50] -->
     <string name="alert_not_available">Not available</string>
+
+    <string name="loading_message">Loading...</string>
 </resources>
