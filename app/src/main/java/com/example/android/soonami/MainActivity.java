@@ -201,12 +201,15 @@ public class MainActivity extends AppCompatActivity {
                 urlConnection.setReadTimeout(10000 /* milliseconds */);
                 urlConnection.setConnectTimeout(15000 /* milliseconds */);
                 urlConnection.connect();
-                if (urlConnection.getResponseCode() / 100 == 2) {
+                int responseCode = urlConnection.getResponseCode();
+                if (responseCode / 100 == 2) {
                     inputStream = urlConnection.getInputStream();
                     jsonResponse = readFromStream(inputStream);
+                } else {
+                    Log.e(LOG_TAG, "Response code: " + responseCode);
                 }
             } catch (IOException e) {
-                Log.e(LOG_TAG, "Problem with making HTTP request", e);
+                Log.e(LOG_TAG, "Problem retrieving the earthquake JSON results", e);
             } finally {
                 if (urlConnection != null) {
                     urlConnection.disconnect();
